@@ -21,14 +21,24 @@ public class Intake extends Subsystem
 	public DigitalInput breakbeam;
 	public double setPoint;
 	public double rotations;
-	public int state;
+	
+	public boolean enabled = false;
+	
+	public enum RotateState {
+		ROTATEOUT,
+		ROTATEIN,
+		HOLD,
+		DISABLED
+	};
+	
+	public RotateState currState = RotateState.DISABLED;
 	
 	public Intake()  
 	{
-		state = 0; //0 = disabled, 1 = rotating out, 2 = rotating in, 3 = hold
-		Hardware.left = new TalonSRX(Constants.talonLeftIntake);	//left cantalon port tbd
-		Hardware.right = new TalonSRX(Constants.talonRightIntake);   //right cantalon port tbd
-		Hardware.rot = new TalonSRX(Constants.talonRotateIntake);     //rot cantalon port tbd
+
+		Hardware.left = new TalonSRX(Constants.talonLeftIntake);	
+		Hardware.right = new TalonSRX(Constants.talonRightIntake);  
+		Hardware.rot = new TalonSRX(Constants.talonRotateIntake);     
 		
 		/* first choose the sensor */
 		Hardware.rot.configSelectedFeedbackSensor(FeedbackDevice.CTRE_MagEncoder_Relative, Constants.kPIDLoopIdx, Constants.kTimeoutMs);
@@ -71,53 +81,61 @@ public class Intake extends Subsystem
 	{
 		Hardware.left.set(ControlMode.PercentOutput, -0.65);
 		Hardware.right.set(ControlMode.PercentOutput, 0.65);
-		//Robot.carriage.intakeCube(-0.45); //use if carriage is needed
 	}
 	
 	public void outtakeCube() 
 	{
 		Hardware.left.set(ControlMode.PercentOutput, 0.65);
 		Hardware.right.set(ControlMode.PercentOutput, -0.65);
-		//Robot.carriage.outtakeCube(-1); //use if carriage is needed
 	}
 	
 	public void rotateIn()
 	{
-		setPoint = 4096 * rotations;
-		Hardware.rot.set(ControlMode.MotionMagic, setPoint);
+		currState = RotateState.ROTATEIN;
 	}
 	
 	public void rotateOut()
 	{
-		setPoint = -4096 * rotations;
-		Hardware.rot.set(ControlMode.MotionMagic, setPoint);
+		currState = RotateState.ROTATEOUT;
 	}
 	
 	public void loop()
 	{
-		if(state == 1)
+		switch(currState)
 		{
+		
+		case DISABLED:
+			
+			if(enabled)
+			{
+				currState = RotateState.HOLD;
+			}
+			
+		case ROTATEOUT:
+			
+			
 			if(Hardware.rot.getSelectedSensorPosition(0) > Constants.lowBufferIntakeOut)
 			{
 				stop();
-				state = 3;
+				currState = RotateState.HOLD;
 			}
 			else
 			{
 				Hardware.rot.set(ControlMode.MotionMagic, setPoint);
 			}
-		}
-		else if(state == 2)
-		{
+	
+		case ROTATEIN:
+			
 			if(Hardware.rot.getSelectedSensorPosition(0) < Constants.lowBufferIntakeIn)
 			{
 				stop();
-				state = 3;
+				currState = RotateState.HOLD;
 			}
 			else
 			{
 				Hardware.rot.set(ControlMode.MotionMagic, setPoint);
 			}
+			
 		}
 	}
 	
